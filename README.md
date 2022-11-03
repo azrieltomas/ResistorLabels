@@ -30,3 +30,7 @@ This is based on an idea from Zach Poff.
 For more details on how to use these labels, visit his website:
 
 https://www.zachpoff.com/resources/quick-easy-and-cheap-resistor-storage/
+
+# Additions
+-   Create multiple pages from a long list
+-   Consider / to do: 0 Ohm, data imports, code structures
