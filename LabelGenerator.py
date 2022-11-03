@@ -54,6 +54,8 @@ class PaperConfig:
         top_margin: float,
         horizontal_stride: float,
         vertical_stride: float,
+        columns=int,
+        rows=int,
     ) -> None:
         self.pagesize = pagesize
         self.sticker_width = sticker_width
@@ -63,6 +65,8 @@ class PaperConfig:
         self.top_margin = top_margin
         self.horizontal_stride = horizontal_stride
         self.vertical_stride = vertical_stride
+        self.columns = columns
+        self.rows = rows
 
 
 AVERY_5260 = PaperConfig(
@@ -74,6 +78,8 @@ AVERY_5260 = PaperConfig(
     top_margin=0.5 * inch,
     horizontal_stride=(2 + 6/8) * inch,
     vertical_stride=1 * inch,
+    columns=3,
+    rows=10,
 )
 
 
@@ -86,6 +92,8 @@ AVERY_L7157 = PaperConfig(
     top_margin=14.1 * mm,
     horizontal_stride=66.552 * mm,
     vertical_stride=24.3 * mm,
+    columns=3,
+    rows=11,
 )
 
 
@@ -98,6 +106,8 @@ EJ_RANGE_24 = PaperConfig(
     top_margin=13.2 * mm,
     horizontal_stride=66.45 * mm,
     vertical_stride=33.9 * mm,
+    columns=3,
+    rows=8,
 )
 
 
@@ -114,7 +124,7 @@ class StickerRect:
 
 class ResistorValue:
     def __init__(self, ohms):
-        # Fixed-point value with 2 decimals precision
+        # Fixed-point value with 2 decimals precisions
         ohms_exp = math.floor(math.log10(ohms))
         ohms_val = round(ohms / math.pow(10, ohms_exp - 2))
         ohms_exp -= 2
@@ -471,52 +481,64 @@ def render_outlines(c, layout: PaperConfig):
             c.setLineWidth(0)
             c.roundRect(rect.left, rect.bottom, rect.width, rect.height, rect.corner)
 
+def page_numbers(values, layout):
+    return math.ceil(len(values) / (layout.columns * layout.rows))
+
+def convert_array(values1D, layout, pages):
+    # append None to array to pad length to fit page(s)
+    for i in range(len(values1D), (pages * layout.columns * layout.rows)):
+        values1D.append(None)
+    
+    # initialise an empty 2D array
+    values2D = [[None] * layout.columns for i in range(pages * layout.rows)]
+    
+    # move the 1D array values into the 2D array
+    arrayCount = 0
+    for row in range(pages * layout.rows):
+        for col in range(layout.columns):
+            values2D[row][col] = values1D[arrayCount]
+            arrayCount += 1
+
+    return values2D
 
 def main():
 
     # ############################################################################
     # Select the correct type of paper you want to print on.
     # ############################################################################
-    layout = AVERY_5260
-    # layout = AVERY_L7157
+    # layout = AVERY_5260
+    layout = AVERY_L7157
     # layout = EJ_RANGE_24
 
     # ############################################################################
+    
     # Put your own resistor values in here!
-    #
-    # This has to be a grid of:
-    #  - 10*3 values for Avery 5260
-    #  - 11*3 for Avery L7157.
-    #  - 8*3 for EJ Range 24
-    #
     # Add "None" if no label should get generated at a specific position.
-    # ############################################################################
-    resistor_values = [
-        [.1,           .02,          .003],
-        [1,            12,           13],
-        [210,          220,          330],
-        [3100,         3200,         3300],
-        [41000,        42000,        43000],
-        [510000,       None,         530000],
-        [6100000,      6200000,      6300000],
-        [71000000,     72000000,     73000000],
-        [810000000,    820000000,    830000000],
-        [9100000000,   9200000000,   3300000000],
-    ]
+    resistor_values_1d = [1.5, 2.2, 4.7, 10, 12, 15, 22, 27, 33, 39, 47, 56, 68, 75, 82, 100, 120, 160, 180, 220, 270, 330, 390, 470, 560, \
+       680, 820, 910, 1000, 1100, 1200, 1800, 2200, 3300, 3900, 4700, 5600, 6800, 8200, 10000, 12000, 15000, 18000, 22000, 27000, 33000, 39000, \
+       47000, 56000, 68000, 82000, 91000, 100000, 120000, 150000, 180000, 200000, 220000, 270000, 330000, 390000, 470000, 560000, 750000, 1000000]
 
-    # Create the render canvas
-    c = canvas.Canvas("ResistorLabels.pdf", pagesize=layout.pagesize)
+    # determine the total page numbers from the array size
+    pages = page_numbers(resistor_values_1d, layout)
 
-    # Render the stickers
-    render_stickers(c, layout, resistor_values)
+    # convert array to 2D for printing
+    resistor_values = convert_array(resistor_values_1d, layout, pages)
 
-    # # Add this if you want to see the outlines of the labels.
-    # # Recommended to be commented out for the actual printing.
-    # render_outlines(c, layout)
+    # generate the pdf
+    for i in range(1, pages + 1):
+        # Create the render canvas
+        c = canvas.Canvas("ResistorLabels_p" + str(i) + ".pdf", pagesize=layout.pagesize)
 
-    # Store canvas to PDF file
-    c.showPage()
-    c.save()
+        # Render the stickers
+        render_stickers(c, layout, resistor_values[layout.rows * i - layout.rows:layout.rows * i])
+
+        # Add this if you want to see the outlines of the labels.
+        # Recommended to be commented out for the actual printing.
+        # render_outlines(c, layout)
+
+        # Store canvas to PDF file
+        c.showPage()
+        c.save()
 
 
 if __name__ == "__main__":
